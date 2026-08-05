@@ -67,6 +67,7 @@ end
 
 local function BuildMacro(settings)
     local lines = {
+        "/tm [@focus]0",
         "/clearfocus [@mouseover,noexists]",
         "/stopmacro [@mouseover,noexists]",
         "/focus [@mouseover,exists]",

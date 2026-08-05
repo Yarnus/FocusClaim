@@ -262,6 +262,7 @@ test("the default macro has the fixed compact structure", function()
     local environment = loadAddon("enUS")
     local macroText = environment.addon:BuildFocusMacro()
     local expected = table.concat({
+        "/tm [@focus]0",
         "/clearfocus [@mouseover,noexists]",
         "/stopmacro [@mouseover,noexists]",
         "/focus [@mouseover,exists]",
@@ -271,7 +272,6 @@ test("the default macro has the fixed compact structure", function()
 
     assertEqual(macroText, expected)
     assertEqual(#macroText < 255, true)
-    assertNotContains(macroText, "@focus")
 end)
 
 test("the four channel settings only change the final line", function()

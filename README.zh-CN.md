@@ -7,8 +7,8 @@ FocusClaim 是一个轻量的 WoW 正式服插件，用于将鼠标指向单位�
 ## 功能
 
 - 使用 `Shift / Alt / Ctrl + 左键` 将任意鼠标指向单位设置为焦点
-- 在空白处使用相同快捷键清除焦点
-- 为新焦点设置所选团队标记，但不清除旧焦点标记
+- 在空白处使用相同快捷键移除当前焦点标记并清除焦点
+- 将所选团队标记移动到新焦点
 - 向队伍、副本或团队频道发送 `我焦点{rtN}`
 - 可以关闭喊话，同时保留焦点和标记行为
 - 支持暴雪原生单位框和姓名板、DandersFrames、EllesmereUI、Enhance QoL 和 UUF 的单位框、队伍框与团队框
@@ -34,6 +34,7 @@ FocusClaim 将一条短宏直接写入安全按钮和支持的单位框，不再
 简体中文默认宏为：
 
 ```text
+/tm [@focus]0
 /clearfocus [@mouseover,noexists]
 /stopmacro [@mouseover,noexists]
 /focus [@mouseover,exists]

@@ -8,8 +8,8 @@ focus, applying a raid marker, and announcing that focus to the group.
 ## Features
 
 - Set any mouseover unit as focus with `Shift / Alt / Ctrl + Left Click`
-- Clear focus with the same shortcut over empty space
-- Apply one selected raid marker without clearing the previous focus marker
+- Remove the current focus marker and clear focus with the same shortcut over empty space
+- Move one selected raid marker to the new focus
 - Announce `My focus {rtN}` to party, instance, or raid chat
 - Disable callouts while retaining focus and marker behavior
 - Support Blizzard frames and nameplates, DandersFrames, EllesmereUI,
@@ -41,6 +41,7 @@ controls are created only when the panel is first opened.
 The default English macro is:
 
 ```text
+/tm [@focus]0
 /clearfocus [@mouseover,noexists]
 /stopmacro [@mouseover,noexists]
 /focus [@mouseover,exists]
