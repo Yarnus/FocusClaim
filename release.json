@@ -1,0 +1,24 @@
+{
+  "releases": [
+    {
+      "name": "FocusClaim",
+      "version": "v1.0.0",
+      "filename": "FocusClaim-v1.0.0.zip",
+      "nolib": false,
+      "metadata": [
+        {
+          "flavor": "mainline",
+          "interface": 120007
+        },
+        {
+          "flavor": "mainline",
+          "interface": 120001
+        },
+        {
+          "flavor": "mainline",
+          "interface": 110107
+        }
+      ]
+    }
+  ]
+}

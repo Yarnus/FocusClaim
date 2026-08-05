@@ -1,0 +1,13 @@
+## Interface: 120007, 120001, 110107
+## Title: FocusClaim
+## Notes: Claim mouseover focus with a raid marker and optional group callout.
+## Notes-zhCN: 设置鼠标指向焦点、团队标记并可选向队伍喊话。
+## Notes-zhTW: 設定滑鼠指向焦點、團隊標記並可選向隊伍喊話。
+## IconTexture: Interface\AddOns\FocusClaim\FocusClaim.tga
+## Author: Yarnus
+## Version: 1.0.0
+## SavedVariablesPerCharacter: FocusClaimSettings
+
+Localization.lua
+FrameProviders.lua
+FocusClaim.lua
