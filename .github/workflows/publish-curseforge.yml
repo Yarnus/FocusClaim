@@ -1,0 +1,103 @@
+name: Publish to CurseForge
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: curseforge-${{ github.event.release.id }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+      CF_TOKEN: ${{ secrets.CF_TOKEN }}
+      CHANGELOG: ${{ github.event.release.body }}
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_NAME: ${{ github.event.release.name }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      RELEASE_TYPE: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+
+    steps:
+      - name: Validate configuration
+        run: |
+          set -euo pipefail
+          test -n "$CF_PROJECT_ID" || { echo "CF_PROJECT_ID is not configured"; exit 1; }
+          test -n "$CF_TOKEN" || { echo "CF_TOKEN is not configured"; exit 1; }
+
+      - name: Download release assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern release.json \
+            --dir dist
+
+          asset_name=$(jq -er \
+            --arg version "$RELEASE_TAG" \
+            '.releases[] | select(.version == $version) | .filename' \
+            dist/release.json)
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$asset_name" \
+            --dir dist
+          test -s "dist/$asset_name"
+
+      - name: Upload release
+        run: |
+          set -euo pipefail
+          asset_name=$(jq -er \
+            --arg version "$RELEASE_TAG" \
+            '.releases[] | select(.version == $version) | .filename' \
+            dist/release.json)
+
+          game_versions=$(jq -ce \
+            --arg version "$RELEASE_TAG" '
+              def game_version:
+                . as $interface
+                | (($interface / 10000) | floor | tostring)
+                  + "."
+                  + ((($interface % 10000) / 100) | floor | tostring)
+                  + "."
+                  + (($interface % 100) | tostring);
+              [
+                .releases[]
+                | select(.version == $version)
+                | .metadata[]
+                | select(.flavor == "mainline")
+                | .interface
+                | game_version
+              ]
+              | unique
+              | if length > 0 then . else error("No mainline versions found") end
+            ' dist/release.json)
+
+          display_name="${RELEASE_NAME:-FocusClaim $RELEASE_TAG}"
+          metadata=$(jq -nc \
+            --arg changelog "${CHANGELOG:-No changelog provided.}" \
+            --arg displayName "$display_name" \
+            --arg releaseType "$RELEASE_TYPE" \
+            --argjson gameVersionNames "$game_versions" '
+              {
+                changelog: $changelog,
+                changelogType: "markdown",
+                displayName: $displayName,
+                gameVersionNames: $gameVersionNames,
+                releaseType: $releaseType,
+                isMarkedForManualRelease: false
+              }
+            ')
+
+          response=$(curl --fail-with-body --silent --show-error \
+            --header "X-Api-Token: $CF_TOKEN" \
+            --form-string "metadata=$metadata" \
+            --form "file=@dist/$asset_name;type=application/zip" \
+            "https://wow.curseforge.com/api/projects/$CF_PROJECT_ID/upload-file")
+          file_id=$(jq -er '.id' <<< "$response")
+          echo "Uploaded CurseForge file ID $file_id"
