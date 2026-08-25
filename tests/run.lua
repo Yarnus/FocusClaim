@@ -267,7 +267,7 @@ test("the default macro has the fixed compact structure", function()
         "/stopmacro [@mouseover,noexists]",
         "/focus [@mouseover,exists]",
         "/tm [@mouseover]8",
-        "/p My focus {rt8}",
+        "/p My focus {rt8} %f",
     }, "\n")
 
     assertEqual(macroText, expected)
@@ -282,23 +282,29 @@ test("the four channel settings only change the final line", function()
     settings.channel = "NONE"
     assertNotContains(addon:BuildFocusMacro(), "My focus")
     settings.channel = "PARTY"
-    assertContains(addon:BuildFocusMacro(), "/p My focus {rt8}")
+    assertContains(addon:BuildFocusMacro(), "/p My focus {rt8} %f")
     settings.channel = "INSTANCE"
-    assertContains(addon:BuildFocusMacro(), "/i My focus {rt8}")
+    assertContains(addon:BuildFocusMacro(), "/i My focus {rt8} %f")
     settings.channel = "RAID"
-    assertContains(addon:BuildFocusMacro(), "/ra My focus {rt8}")
+    assertContains(addon:BuildFocusMacro(), "/ra My focus {rt8} %f")
 end)
 
-test("Simplified Chinese uses the fixed localized callout", function()
+test("Simplified Chinese callout includes the focus unit name", function()
     local environment = loadAddon("zhCN")
 
-    assertContains(environment.addon:BuildFocusMacro(), "/p 我焦点{rt8}")
+    assertContains(
+        environment.addon:BuildFocusMacro(),
+        "/p 我焦点打断 {rt8} %f"
+    )
 end)
 
-test("Traditional Chinese uses the fixed localized callout", function()
+test("Traditional Chinese callout includes the focus unit name", function()
     local environment = loadAddon("zhTW")
 
-    assertContains(environment.addon:BuildFocusMacro(), "/p 我焦點{rt8}")
+    assertContains(
+        environment.addon:BuildFocusMacro(),
+        "/p 我焦點打斷 {rt8} %f"
+    )
 end)
 
 test("a unit frame receives direct macrotext on the configured chord", function()

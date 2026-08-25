@@ -5,7 +5,7 @@ local L = {
     RAID_MARKER = "Raid marker",
     MODIFIER_KEY = "Modifier key",
     CALLOUT_CHANNEL = "Callout channel",
-    CALLOUT = "My focus {rt%d}",
+    CALLOUT = "My focus {rt%d} %%f",
     CHANNEL_NONE = "Disabled",
     CHANNEL_PARTY = "Party (/p)",
     CHANNEL_INSTANCE = "Instance (/i)",
@@ -22,7 +22,7 @@ if locale == "zhCN" then
     L.RAID_MARKER = "团队标记"
     L.MODIFIER_KEY = "修饰键"
     L.CALLOUT_CHANNEL = "喊话频道"
-    L.CALLOUT = "我焦点{rt%d}"
+    L.CALLOUT = "我焦点打断 {rt%d} %%f"
     L.CHANNEL_NONE = "关闭"
     L.CHANNEL_PARTY = "队伍 (/p)"
     L.CHANNEL_INSTANCE = "副本 (/i)"
@@ -36,7 +36,7 @@ elseif locale == "zhTW" then
     L.RAID_MARKER = "團隊標記"
     L.MODIFIER_KEY = "修飾鍵"
     L.CALLOUT_CHANNEL = "喊話頻道"
-    L.CALLOUT = "我焦點{rt%d}"
+    L.CALLOUT = "我焦點打斷 {rt%d} %%f"
     L.CHANNEL_NONE = "關閉"
     L.CHANNEL_PARTY = "隊伍 (/p)"
     L.CHANNEL_INSTANCE = "副本 (/i)"

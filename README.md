@@ -10,7 +10,7 @@ focus, applying a raid marker, and announcing that focus to the group.
 - Set any mouseover unit as focus with `Shift / Alt / Ctrl + Left Click`
 - Remove the current focus marker and clear focus with the same shortcut over empty space
 - Move one selected raid marker to the new focus
-- Announce `My focus {rtN}` to party, instance, or raid chat
+- Announce `My focus {rtN} {unit name}` to party, instance, or raid chat
 - Disable callouts while retaining focus and marker behavior
 - Support Blizzard frames and nameplates, DandersFrames, EllesmereUI,
   Enhance QoL, and UUF unit, party, and raid frames
@@ -46,7 +46,7 @@ The default English macro is:
 /stopmacro [@mouseover,noexists]
 /focus [@mouseover,exists]
 /tm [@mouseover]8
-/p My focus {rt8}
+/p My focus {rt8} %f
 ```
 
 Settings changed during combat take effect after combat ends.
