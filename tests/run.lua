@@ -40,6 +40,7 @@ end
 local globalsToClear = {
     "FocusClaimClickButton",
     "FocusClaimOptionsPanel",
+    "FocusClaimFocusCastBar",
     "FocusClaimMarkerDropdown",
     "FocusClaimModifierDropdown",
     "FocusClaimChannelDropdown",
@@ -61,11 +62,52 @@ local globalsToClear = {
     "ERFPartySelfButton",
 }
 
-local function newFrame()
+local function newTexture()
+    local texture = {}
+    function texture:SetPoint(...)
+        self.point = { ... }
+        self.points = self.points or {}
+        self.points[#self.points + 1] = { ... }
+    end
+    function texture:SetAllPoints(...) self.allPoints = { ... } end
+    function texture:ClearAllPoints() self.points = {} end
+    function texture:SetSize(width, height) self.width, self.height = width, height end
+    function texture:SetTexture(value) self.texture = value end
+    function texture:SetColorTexture(...) self.color = { ... } end
+    function texture:SetVertexColor(...) self.vertexColor = { ... } end
+    function texture:SetAlpha(value) self.alpha = value end
+    function texture:SetAlphaFromBoolean(value, trueAlpha, falseAlpha)
+        if issecretvalue and issecretvalue(value) then value = value.value end
+        if value then
+            self.alpha = trueAlpha
+        else
+            self.alpha = falseAlpha
+        end
+    end
+    return texture
+end
+
+local function newFontString()
+    local fontString = {}
+    function fontString:SetPoint(...) self.point = { ... } end
+    function fontString:SetText(text) self.text = text end
+    function fontString:SetFormattedText(format, ...)
+        self.text = string.format(format, ...)
+    end
+    function fontString:SetWidth(width) self.width = width end
+    function fontString:SetJustifyH(value) self.justify = value end
+    function fontString:SetWordWrap(value) self.wordWrap = value end
+    return fontString
+end
+
+local function newFrame(frameType)
     local frame = {
         attributes = {},
         events = {},
         scripts = {},
+        frameType = frameType,
+        shown = true,
+        moving = false,
     }
 
     function frame:SetAttribute(key, value)
@@ -86,16 +128,82 @@ local function newFrame()
         self.events[event] = true
     end
 
+    function frame:RegisterUnitEvent(event, unit)
+        self.events[event] = unit
+    end
+
     function frame:RegisterForClicks(...)
         self.registeredClicks = { ... }
     end
 
+    function frame:RegisterForDrag(...) self.registeredDrag = { ... } end
     function frame:SetPoint(...) self.point = { ... } end
-
+    function frame:ClearAllPoints() self.point = nil end
+    function frame:SetAllPoints(...) self.allPoints = { ... } end
+    function frame:SetSize(width, height) self.width, self.height = width, height end
+    function frame:SetWidth(width) self.width = width end
+    function frame:SetHeight(height) self.height = height end
+    function frame:GetWidth() return self.width or 0 end
+    function frame:GetHeight() return self.height or 0 end
+    function frame:SetMovable(value) self.movable = value end
+    function frame:EnableMouse(value) self.mouseEnabled = value end
+    function frame:SetFrameStrata(value) self.strata = value end
+    function frame:SetClampedToScreen(value) self.clamped = value end
+    function frame:StartMoving() self.moving = true end
+    function frame:StopMovingOrSizing() self.moving = false end
+    function frame:GetCenter()
+        if self.center then return self.center[1], self.center[2] end
+        if self.point then
+            local count = #self.point
+            return self.point[count - 1], self.point[count]
+        end
+        return 0, 0
+    end
+    function frame:Show() self.shown = true end
+    function frame:Hide() self.shown = false end
+    function frame:IsShown() return self.shown end
+    function frame:SetAlpha(value) self.alpha = value end
+    function frame:SetAlphaFromBoolean(value, trueAlpha, falseAlpha)
+        if issecretvalue and issecretvalue(value) then value = value.value end
+        if value then
+            self.alpha = trueAlpha
+        else
+            self.alpha = falseAlpha
+        end
+    end
+    function frame:SetStatusBarTexture(texture)
+        self.statusBarTexture = newTexture()
+        self.statusBarTexture.texture = texture
+        return self.statusBarTexture
+    end
+    function frame:GetStatusBarTexture()
+        if not self.statusBarTexture then
+            self.statusBarTexture = newTexture()
+        end
+        return self.statusBarTexture
+    end
+    function frame:SetMinMaxValues(minimum, maximum)
+        self.minimum, self.maximum = minimum, maximum
+    end
+    function frame:SetValue(value) self.value = value end
+    function frame:SetTimerDuration(duration, interpolation, direction)
+        self.timerDuration = duration
+        self.timerDirection = direction
+    end
+    function frame:SetReverseFill(value) self.reverseFill = value end
+    function frame:SetFillStyle(value) self.fillStyle = value end
+    function frame:SetChecked(value) self.checked = value end
+    function frame:GetChecked() return self.checked end
+    function frame:CreateTexture()
+        local texture = newTexture()
+        self.textures = self.textures or {}
+        self.textures[#self.textures + 1] = texture
+        return texture
+    end
     function frame:CreateFontString()
-        local fontString = {}
-        function fontString:SetPoint(...) self.point = { ... } end
-        function fontString:SetText(text) self.text = text end
+        local fontString = newFontString()
+        self.fontStrings = self.fontStrings or {}
+        self.fontStrings[#self.fontStrings + 1] = fontString
         return fontString
     end
 
@@ -114,6 +222,12 @@ local function loadAddon(locale, settings)
         openedCategory = nil,
         override = nil,
         timers = {},
+        class = "ROGUE",
+        knownSpells = {},
+        range = true,
+        usable = true,
+        cooldownDuration = nil,
+        castInfo = nil,
     }
 
     function environment:RunTimers()
@@ -125,8 +239,86 @@ local function loadAddon(locale, settings)
     end
 
     FocusClaimSettings = settings
-    UIParent = {}
+    UIParent = {
+        GetCenter = function() return 0, 0 end,
+    }
     SlashCmdList = {}
+    Enum = {
+        SpellBookSpellBank = { Pet = "PET" },
+        StatusBarTimerDirection = {
+            ElapsedTime = "ELAPSED",
+            RemainingTime = "REMAINING",
+        },
+        StatusBarFillStyle = { Standard = "STANDARD", Reverse = "REVERSE" },
+    }
+    issecretvalue = function(value)
+        return type(value) == "table" and value.secret == true
+    end
+    UnitClassBase = function() return environment.class end
+    C_SpellBook = {
+        IsSpellKnownOrInSpellBook = function(spellID, bank)
+            local known = environment.knownSpells[spellID]
+            if bank == "PET" then
+                return known == "pet"
+            end
+            return known == "player" or known == true
+        end,
+    }
+    C_CurveUtil = {
+        EvaluateColorValueFromBoolean = function(value, falseValue, trueValue)
+            if issecretvalue(value) then value = value.value end
+            if value then return trueValue end
+            return falseValue
+        end,
+    }
+    C_Spell = {
+        IsSpellInRange = function()
+            return environment.range
+        end,
+        IsSpellUsable = function()
+            return environment.usable
+        end,
+        GetSpellCooldownDuration = function()
+            return environment.cooldownDuration
+        end,
+    }
+    local function CastDetails(kind)
+        local cast = environment.castInfo
+        if not cast or cast.kind ~= kind then return end
+        if kind == "channel" or kind == "empowered" then
+            return cast.name, nil, cast.icon, nil, nil, nil, cast.notInterruptible
+        end
+        return cast.name, nil, cast.icon, nil, nil, nil, nil, cast.notInterruptible
+    end
+    UnitChannelDuration = function()
+        local cast = environment.castInfo
+        return cast and cast.kind == "channel" and cast.duration
+    end
+    UnitEmpoweredChannelDuration = function()
+        local cast = environment.castInfo
+        return cast and cast.kind == "empowered" and cast.duration
+    end
+    UnitCastingDuration = function()
+        local cast = environment.castInfo
+        return cast and cast.kind == "cast" and cast.duration
+    end
+    UnitChannelInfo = function()
+        local cast = environment.castInfo
+        if cast and cast.kind == "channel" then
+            return CastDetails("channel")
+        elseif cast and cast.kind == "empowered" then
+            return CastDetails("empowered")
+        end
+    end
+    UnitCastingInfo = function() return CastDetails("cast") end
+    ColorPickerFrame = {
+        SetupColorPickerAndShow = function(self, info)
+            environment.colorPicker = info
+        end,
+        GetColorRGB = function()
+            return unpack(environment.pickerColor or { 0.1, 0.2, 0.3 })
+        end,
+    }
 
     GetLocale = function()
         return locale or "enUS"
@@ -134,8 +326,8 @@ local function loadAddon(locale, settings)
     InCombatLockdown = function()
         return environment.inCombat
     end
-    CreateFrame = function(_, name)
-        local frame = newFrame()
+    CreateFrame = function(frameType, name)
+        local frame = newFrame(frameType)
         environment.createdFrames[#environment.createdFrames + 1] = frame
         if name then
             _G[name] = frame
@@ -206,18 +398,51 @@ local function loadAddon(locale, settings)
     assert(loadfile("Localization.lua"))("FocusClaim", namespace)
     assert(loadfile("FrameProviders.lua"))("FocusClaim", namespace)
     assert(loadfile("FocusClaim.lua"))("FocusClaim", namespace)
+    assert(loadfile("CastBar.lua"))("FocusClaim", namespace)
     environment.addon = namespace.addon
     environment.L = namespace.L
+    environment.castBar = namespace.castBar
     return environment
 end
 
-test("new settings use three defaults", function()
+local function newDuration(total, elapsed, remaining)
+    return {
+        GetTotalDuration = function() return total end,
+        GetElapsedDuration = function() return elapsed end,
+        GetRemainingDuration = function() return remaining end,
+    }
+end
+
+local function newCooldown(ready, remaining)
+    return {
+        IsZero = function() return ready end,
+        GetRemainingDuration = function() return remaining end,
+    }
+end
+
+local function castEvent(environment, event, ...)
+    environment.castBar.eventFrame.scripts.OnEvent(
+        environment.castBar.eventFrame,
+        event,
+        ...
+    )
+end
+
+test("new settings preserve existing defaults and add a safe cast-bar default", function()
     local environment = loadAddon("enUS")
     local settings = environment.addon:GetSettings()
 
     assertEqual(settings.modifier, "shift")
     assertEqual(settings.marker, 8)
     assertEqual(settings.channel, "PARTY")
+    assertEqual(settings.castBarEnabled, false)
+    assertEqual(settings.castBarLocked, true)
+    assertEqual(settings.castBarX, 0)
+    assertEqual(settings.castBarY, 0)
+    assertEqual(settings.castBarColors.grey.r, 0.45)
+    assertEqual(settings.castBarColors.green.g, 0.8)
+    assertEqual(settings.castBarColors.orange.r, 0.95)
+    assertEqual(settings.castBarColors.unknown.b, 0.72)
     assertEqual(settings.enabled, nil)
 end)
 
@@ -233,6 +458,10 @@ test("invalid settings return to supported defaults", function()
     assertEqual(settings.modifier, "shift")
     assertEqual(settings.marker, 8)
     assertEqual(settings.channel, "PARTY")
+    assertEqual(settings.castBarEnabled, false)
+    assertEqual(settings.castBarLocked, true)
+    assertEqual(settings.castBarX, 0)
+    assertEqual(settings.castBarY, 0)
     assertEqual(settings.enabled, nil)
 end)
 
@@ -255,7 +484,35 @@ test("saved settings are normalized when FocusClaim finishes loading", function(
     assertEqual(settings.modifier, "shift")
     assertEqual(settings.marker, 8)
     assertEqual(settings.channel, "PARTY")
+    assertEqual(settings.castBarEnabled, false)
+    assertEqual(settings.castBarLocked, true)
+    assertEqual(settings.castBarColors.grey.r, 0.45)
     assertEqual(settings.enabled, nil)
+end)
+
+test("invalid cast-bar colors and coordinates normalize to safe defaults", function()
+    local environment = loadAddon("enUS", {
+        castBarX = 10001,
+        castBarY = 12,
+        castBarEnabled = true,
+        castBarLocked = false,
+        castBarColors = {
+            grey = { r = 2, g = 0, b = 0 },
+            green = { r = 0.1, g = 0.2, b = 0.3 },
+            orange = "invalid",
+            unknown = { r = 0, g = 0 / 0, b = 0 },
+        },
+    })
+    local settings = environment.addon:GetSettings()
+
+    assertEqual(settings.castBarEnabled, true)
+    assertEqual(settings.castBarLocked, false)
+    assertEqual(settings.castBarX, 0)
+    assertEqual(settings.castBarY, 12)
+    assertEqual(settings.castBarColors.grey.r, 0.45)
+    assertEqual(settings.castBarColors.green.r, 0.1)
+    assertEqual(settings.castBarColors.orange.g, 0.42)
+    assertEqual(settings.castBarColors.unknown.b, 0.72)
 end)
 
 test("the default macro has the fixed compact structure", function()
@@ -305,6 +562,349 @@ test("Traditional Chinese callout includes the focus unit name", function()
         environment.addon:BuildFocusMacro(),
         "/p 我焦點打斷 {rt8} %f"
     )
+end)
+
+test("cast bar is opt-in and settings changes preserve its character position", function()
+    local environment = loadAddon("enUS")
+    local manager = environment.castBar
+    local settings = environment.addon:GetSettings()
+
+    environment.castInfo = {
+        kind = "cast",
+        name = "Shadowstep",
+        icon = "spell-icon",
+        notInterruptible = false,
+        duration = newDuration(4, 1, 3),
+    }
+    environment.knownSpells[1766] = "player"
+    environment.cooldownDuration = newCooldown(true, 0)
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "cast-1")
+    assertEqual(manager.frame:IsShown(), false)
+    assertEqual(manager.frame.scripts.OnUpdate, nil)
+
+    settings.castBarEnabled = true
+    environment.addon:SettingsChanged()
+    assertEqual(manager.frame:IsShown(), true)
+    assertEqual(manager.frame.timerDirection, "ELAPSED")
+    assertEqual(manager.frame.timerDuration, environment.castInfo.duration)
+    assertEqual(manager.nameText.text, "Shadowstep")
+    assertEqual(manager.timeText.text, "3.0")
+    assertEqual(manager.barTexture.vertexColor[2], settings.castBarColors.green.g)
+
+    manager.frame.center = { 48, -92 }
+    manager.frame.scripts.OnDragStart(manager.frame)
+    assertEqual(manager.frame.moving, false)
+    settings.castBarLocked = false
+    environment.addon:SettingsChanged()
+    manager.frame.scripts.OnDragStart(manager.frame)
+    assertEqual(manager.frame.moving, true)
+    manager.frame.scripts.OnDragStop(manager.frame)
+    assertEqual(settings.castBarX, 48)
+    assertEqual(settings.castBarY, -92)
+    assertEqual(manager.frame:IsShown(), true)
+
+    castEvent(environment, "UNIT_SPELLCAST_STOP", "focus", "cast-1")
+    assertEqual(manager.frame:IsShown(), true)
+    assertEqual(manager.previewText.text, environment.L.CASTBAR_PREVIEW)
+    assertEqual(manager.frame.scripts.OnUpdate, nil)
+end)
+
+test("idle unlocked cast bars preview, drag, and restore their saved position", function()
+    local settings = {
+        castBarEnabled = true,
+        castBarLocked = true,
+        castBarX = 12,
+        castBarY = -34,
+    }
+    local environment = loadAddon("enUS", settings)
+    settings = environment.addon:GetSettings()
+    local manager = environment.castBar
+
+    assertEqual(manager.frame:IsShown(), false)
+    assertEqual(manager.previewText.text, "")
+    settings.castBarLocked = false
+    environment.addon:SettingsChanged()
+    assertEqual(manager.frame:IsShown(), true)
+    assertEqual(manager.previewText.text, environment.L.CASTBAR_PREVIEW)
+    assertEqual(manager.frame.mouseEnabled, true)
+
+    manager.frame.center = { 48, -92 }
+    manager.frame.scripts.OnDragStart(manager.frame)
+    assertEqual(manager.frame.moving, true)
+    manager.frame.scripts.OnDragStop(manager.frame)
+    assertEqual(settings.castBarX, 48)
+    assertEqual(settings.castBarY, -92)
+
+    settings.castBarLocked = true
+    environment.addon:SettingsChanged()
+    assertEqual(manager.frame:IsShown(), false)
+    assertEqual(manager.frame.mouseEnabled, false)
+
+    local reloaded = loadAddon("enUS", settings)
+    assertEqual(reloaded.castBar.frame.point[4], 48)
+    assertEqual(reloaded.castBar.frame.point[5], -92)
+    assertEqual(reloaded.castBar.frame:IsShown(), false)
+    settings = reloaded.addon:GetSettings()
+    settings.castBarLocked = false
+    reloaded.addon:SettingsChanged()
+    assertEqual(reloaded.castBar.frame:IsShown(), true)
+    assertEqual(reloaded.castBar.frame.point[4], 48)
+    assertEqual(reloaded.castBar.frame.point[5], -92)
+end)
+
+test("cooldown states color the cast and mark its remaining-time boundary", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    local manager = environment.castBar
+    environment.knownSpells[1766] = "player"
+    environment.cooldownDuration = newCooldown(true, 0)
+    environment.castInfo = {
+        kind = "cast",
+        name = "Kickable cast",
+        icon = "spell-icon",
+        notInterruptible = false,
+        duration = newDuration(4, 1, 3),
+    }
+
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "cast-2")
+    assertEqual(manager.barTexture.vertexColor[2], 0.8)
+    assertEqual(manager.readySegment.alpha, 0)
+
+    environment.cooldownDuration = newCooldown(false, 2)
+    castEvent(environment, "SPELL_UPDATE_COOLDOWN")
+    assertEqual(manager.barTexture.vertexColor[1], 0.95)
+    assertEqual(manager.readySegment.alpha, 1)
+    assertEqual(manager.readySegment.vertexColor[2], 0.8)
+    assertEqual(manager.positioner.value, 1)
+    assertEqual(manager.marker.value, 2)
+    assertEqual(manager.readySegment.points[1][2], manager.marker:GetStatusBarTexture())
+
+    environment.cooldownDuration = newCooldown(false, 4)
+    castEvent(environment, "SPELL_UPDATE_COOLDOWN")
+    assertEqual(manager.marker.value, 4)
+    assertEqual(manager.readySegment.points[2][2], manager.frame)
+end)
+
+test("unusable and unknown interrupts never go green, without hiding the cooldown window", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    local manager = environment.castBar
+    local colors = environment.addon:GetSettings().castBarColors
+    environment.knownSpells[1766] = "player"
+    environment.usable = false
+    environment.cooldownDuration = newCooldown(true, 0)
+    environment.castInfo = {
+        kind = "cast",
+        name = "Unusable interrupt",
+        icon = "spell-icon",
+        notInterruptible = false,
+        duration = newDuration(4, 1, 3),
+    }
+
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "cast-unusable")
+    assertEqual(manager.barTexture.vertexColor[1], colors.orange.r)
+    assertEqual(manager.readySegment.alpha, 0)
+
+    -- IsSpellUsable can include the current cooldown in its false result. The
+    -- cooldown duration still predicts the future ready window independently.
+    environment.cooldownDuration = newCooldown(false, 2)
+    castEvent(environment, "SPELL_UPDATE_COOLDOWN")
+    assertEqual(manager.barTexture.vertexColor[1], colors.orange.r)
+    assertEqual(manager.readySegment.alpha, 1)
+
+    environment.usable = nil
+    castEvent(environment, "SPELL_UPDATE_USABLE")
+    assertEqual(manager.barTexture.vertexColor[1], colors.unknown.r)
+    assertEqual(manager.readySegment.alpha, 0)
+
+    local isSpellUsable = C_Spell.IsSpellUsable
+    C_Spell.IsSpellUsable = nil
+    castEvent(environment, "SPELL_UPDATE_USABLE")
+    assertEqual(manager.barTexture.vertexColor[1], colors.unknown.r)
+    C_Spell.IsSpellUsable = isSpellUsable
+
+    environment.usable = true
+    environment.cooldownDuration = newCooldown(true, 0)
+    castEvent(environment, "SPELL_UPDATE_USABLE")
+    assertEqual(manager.barTexture.vertexColor[2], colors.green.g)
+end)
+
+test("secret interrupt usability uses the native safe color path", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    local manager = environment.castBar
+    local colors = environment.addon:GetSettings().castBarColors
+    local function secret(value)
+        return { secret = true, value = value }
+    end
+    environment.knownSpells[1766] = "player"
+    environment.cooldownDuration = newCooldown(true, 0)
+    environment.castInfo = {
+        kind = "cast",
+        name = "Secret usability",
+        icon = "spell-icon",
+        notInterruptible = false,
+        duration = newDuration(4, 1, 3),
+    }
+    environment.usable = secret(false)
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "cast-secret-usable")
+    assertEqual(manager.barTexture.vertexColor[1], colors.orange.r)
+
+    environment.usable = secret(true)
+    castEvent(environment, "SPELL_UPDATE_USABLE")
+    assertEqual(manager.barTexture.vertexColor[2], colors.green.g)
+end)
+
+test("uninterruptible, out-of-range, and unknown states never show a green promise", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    local manager = environment.castBar
+    environment.knownSpells[1766] = "player"
+    environment.cooldownDuration = newCooldown(true, 0)
+    environment.castInfo = {
+        kind = "cast",
+        name = "Protected cast",
+        icon = "spell-icon",
+        notInterruptible = true,
+        duration = newDuration(4, 1, 3),
+    }
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "cast-3")
+    assertEqual(manager.uninterruptibleHost.alpha, 1)
+    assertEqual(manager.uninterruptibleOverlay.vertexColor[1], 0.45)
+
+    environment.castInfo.notInterruptible = false
+    environment.range = false
+    castEvent(environment, "SPELL_UPDATE_USABLE")
+    assertEqual(manager.barTexture.vertexColor[1], 0.95)
+    assertEqual(manager.readySegment.alpha, 0)
+
+    environment.range = nil
+    castEvent(environment, "SPELL_UPDATE_USABLE")
+    assertEqual(manager.barTexture.vertexColor[1], 0.58)
+    assertEqual(manager.barTexture.vertexColor[3], 0.72)
+
+    environment.range = true
+    environment.cooldownDuration = nil
+    castEvent(environment, "SPELL_UPDATE_COOLDOWN")
+    assertEqual(manager.barTexture.vertexColor[1], 0.58)
+
+    environment.cooldownDuration = newCooldown(true, 0)
+    environment.knownSpells = {}
+    castEvent(environment, "SPELLS_CHANGED")
+    assertEqual(manager.interruptSpell, nil)
+    assertEqual(manager.barTexture.vertexColor[1], 0.58)
+end)
+
+test("secret cooldown, range, and interruptibility values use native safe color lanes", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    local manager = environment.castBar
+    local function secret(value)
+        return { secret = true, value = value }
+    end
+    environment.knownSpells[1766] = "player"
+    environment.range = secret(true)
+    environment.cooldownDuration = newCooldown(secret(false), 2)
+    environment.castInfo = {
+        kind = "cast",
+        name = "Secret-state cast",
+        icon = "spell-icon",
+        notInterruptible = secret(false),
+        duration = newDuration(4, 1, 3),
+    }
+
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "cast-secret")
+    assertEqual(manager.barTexture.vertexColor[1], 0.95)
+    assertEqual(manager.readySegment.alpha, 1)
+    assertEqual(manager.uninterruptibleHost.alpha, 0)
+
+    environment.range = secret(false)
+    environment.cooldownDuration = newCooldown(secret(true), 0)
+    environment.castInfo.notInterruptible = secret(true)
+    castEvent(environment, "SPELL_UPDATE_USABLE")
+    assertEqual(manager.barTexture.vertexColor[1], 0.95)
+    assertEqual(manager.readySegment.alpha, 0)
+    assertEqual(manager.uninterruptibleHost.alpha, 1)
+    assertEqual(manager.uninterruptibleOverlay.vertexColor[1], 0.45)
+end)
+
+test("pet and specialization interrupt changes refresh the active cast", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    local manager = environment.castBar
+    environment.class = "WARLOCK"
+    environment.knownSpells[19647] = "player"
+    environment.knownSpells[119910] = "pet"
+    environment.cooldownDuration = newCooldown(false, 2)
+    environment.castInfo = {
+        kind = "cast",
+        name = "Pet kick cast",
+        icon = "spell-icon",
+        notInterruptible = false,
+        duration = newDuration(4, 1, 3),
+    }
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "cast-4")
+    assertEqual(manager.interruptSpell, 119910)
+
+    environment.class = "MAGE"
+    environment.knownSpells = { [2139] = "player" }
+    castEvent(environment, "PLAYER_SPECIALIZATION_CHANGED", "player")
+    assertEqual(manager.interruptSpell, 2139)
+    environment.class = "WARLOCK"
+    environment.knownSpells = { [89766] = "pet" }
+    castEvent(environment, "UNIT_PET", "player")
+    assertEqual(manager.interruptSpell, 89766)
+end)
+
+test("legacy spellbook fallback uses the global known-spell API", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    C_SpellBook = nil
+    IsSpellKnown = function(spellID)
+        return spellID == 2139
+    end
+    environment.class = "MAGE"
+    environment.cooldownDuration = newCooldown(true, 0)
+    environment.castInfo = {
+        kind = "cast",
+        name = "Legacy lookup",
+        icon = "spell-icon",
+        notInterruptible = false,
+        duration = newDuration(3, 1, 2),
+    }
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "cast-legacy")
+    assertEqual(environment.castBar.interruptSpell, 2139)
+end)
+
+test("channel bars use reversed remaining-time progress and stop cleanly", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    local manager = environment.castBar
+    environment.castInfo = {
+        kind = "channel",
+        name = "Channel",
+        icon = "channel-icon",
+        notInterruptible = false,
+        duration = newDuration(6, 2, 4),
+    }
+    castEvent(environment, "UNIT_SPELLCAST_CHANNEL_START", "focus", "channel-1")
+
+    assertEqual(manager.frame:IsShown(), true)
+    assertEqual(manager.frame.timerDirection, "REMAINING")
+    assertEqual(manager.marker.fillStyle, "REVERSE")
+    assertEqual(manager.nameText.text, "Channel")
+    assertEqual(manager.timeText.text, "4.0")
+
+    castEvent(environment, "UNIT_SPELLCAST_CHANNEL_STOP", "focus", "channel-1")
+    assertEqual(manager.frame:IsShown(), false)
+end)
+
+test("cast-bar color controls are localized and editable", function()
+    local environment = loadAddon("zhCN")
+    FocusClaimOptionsPanel.scripts.OnShow(FocusClaimOptionsPanel)
+    assertEqual(environment.L.CASTBAR_ENABLE, "焦点施法时显示")
+
+    local control = environment.castBar.optionControls["color:green"]
+    environment.pickerColor = { 0.3, 0.4, 0.5 }
+    environment.castBar:OpenColorPicker("green", control.swatch)
+    environment.colorPicker.swatchFunc()
+    local color = environment.addon:GetSettings().castBarColors.green
+    assertEqual(color.r, 0.3)
+    assertEqual(color.g, 0.4)
+    assertEqual(color.b, 0.5)
+    assertEqual(control.swatch.color[2], 0.4)
 end)
 
 test("a unit frame receives direct macrotext on the configured chord", function()
@@ -507,8 +1107,8 @@ test("the options controls are created only when first shown", function()
     local builtFrames = #environment.createdFrames
     FocusClaimOptionsPanel.scripts.OnShow(FocusClaimOptionsPanel)
 
-    assertEqual(initialFrames, 2)
-    assertEqual(builtFrames, 5)
+    assertEqual(initialFrames, 9)
+    assertEqual(builtFrames, 18)
     assertEqual(#environment.createdFrames, builtFrames)
 end)
 

@@ -9,6 +9,17 @@ local DEFAULTS = {
     modifier = "shift",
     marker = 8,
     channel = "PARTY",
+    castBarEnabled = false,
+    castBarLocked = true,
+    castBarX = 0,
+    castBarY = 0,
+}
+
+local DEFAULT_CAST_BAR_COLORS = {
+    grey = { r = 0.45, g = 0.45, b = 0.45 },
+    green = { r = 0.20, g = 0.80, b = 0.32 },
+    orange = { r = 0.95, g = 0.42, b = 0.12 },
+    unknown = { r = 0.58, g = 0.66, b = 0.72 },
 }
 
 local MODIFIERS = {
@@ -43,6 +54,27 @@ local function Find(options, value)
     end
 end
 
+local function IsFiniteNumber(value)
+    return type(value) == "number"
+        and value == value
+        and value > -math.huge
+        and value < math.huge
+end
+
+local function NormalizeColor(color, fallback)
+    if type(color) ~= "table"
+        or not IsFiniteNumber(color.r)
+        or not IsFiniteNumber(color.g)
+        or not IsFiniteNumber(color.b)
+        or color.r < 0 or color.r > 1
+        or color.g < 0 or color.g > 1
+        or color.b < 0 or color.b > 1
+    then
+        return { r = fallback.r, g = fallback.g, b = fallback.b }
+    end
+    return { r = color.r, g = color.g, b = color.b }
+end
+
 local function NormalizeSettings()
     local settings = type(FocusClaimSettings) == "table" and FocusClaimSettings or {}
     local modifier = Find(MODIFIERS, settings.modifier) and settings.modifier
@@ -57,11 +89,30 @@ local function NormalizeSettings()
     end
     local channel = Find(CHANNELS, settings.channel) and settings.channel
         or DEFAULTS.channel
+    local colors = type(settings.castBarColors) == "table" and settings.castBarColors or {}
+    local x = settings.castBarX
+    local y = settings.castBarY
+    if not IsFiniteNumber(x) or x < -10000 or x > 10000 then
+        x = DEFAULTS.castBarX
+    end
+    if not IsFiniteNumber(y) or y < -10000 or y > 10000 then
+        y = DEFAULTS.castBarY
+    end
 
     FocusClaimSettings = {
         modifier = modifier,
         marker = marker,
         channel = channel,
+        castBarEnabled = settings.castBarEnabled == true,
+        castBarLocked = settings.castBarLocked ~= false,
+        castBarX = x,
+        castBarY = y,
+        castBarColors = {
+            grey = NormalizeColor(colors.grey, DEFAULT_CAST_BAR_COLORS.grey),
+            green = NormalizeColor(colors.green, DEFAULT_CAST_BAR_COLORS.green),
+            orange = NormalizeColor(colors.orange, DEFAULT_CAST_BAR_COLORS.orange),
+            unknown = NormalizeColor(colors.unknown, DEFAULT_CAST_BAR_COLORS.unknown),
+        },
     }
 end
 
@@ -238,6 +289,9 @@ function addon:SettingsChanged()
     else
         self:RefreshBindings()
     end
+    if self.castBar then
+        self.castBar:SettingsChanged()
+    end
 end
 
 local panel = CreateFrame("Frame", "FocusClaimOptionsPanel", UIParent)
@@ -285,6 +339,12 @@ local function BuildOptions()
     CreateDropdown(panel, L.RAID_MARKER, -65, MARKERS, "marker")
     CreateDropdown(panel, L.MODIFIER_KEY, -140, MODIFIERS, "modifier")
     CreateDropdown(panel, L.CALLOUT_CHANNEL, -215, CHANNELS, "channel")
+    if ns.castBar then
+        ns.castBar:BuildOptions(panel, -285)
+    end
+    if panel.SetHeight then
+        panel:SetHeight(585)
+    end
 end
 
 local function RefreshOptions()
@@ -292,6 +352,9 @@ local function RefreshOptions()
         local control = controls[index]
         local option = Find(control.options, FocusClaimSettings[control.setting])
         UIDropDownMenu_SetText(control.dropdown, option and option.text or "")
+    end
+    if ns.castBar then
+        ns.castBar:RefreshOptions()
     end
 end
 

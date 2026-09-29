@@ -14,17 +14,29 @@ focus, applying a raid marker, and announcing that focus to the group.
 - Disable callouts while retaining focus and marker behavior
 - Support Blizzard frames and nameplates, DandersFrames, EllesmereUI,
   Enhance QoL, and UUF unit, party, and raid frames
+- Optional, movable focus cast bar with an interrupt-readiness timeline
 
 FocusClaim owns the selected modifier and left-click combination on supported
 unit frames. An existing click-cast action on that combination is overwritten.
 
 ## Usage
 
-Enter `/fc` or `/focusclaim` to open the settings panel. The panel contains only:
+Enter `/fc` or `/focusclaim` to open the settings panel. It contains:
 
 - Raid marker `1-8`
 - Modifier key `Shift / Alt / Ctrl`
 - Callout channel `Disabled / Party / Instance / Raid`
+- An optional focus cast bar, locked by default; unlock it to drag and save its position
+- Editable grey, green, orange, and neutral cast-bar colors
+
+The cast bar is off by default and normally appears only while the focus is
+casting or channeling. When enabled and unlocked, an idle preview remains visible
+to show where it can be dragged. During casts it shows the spell icon, name, and
+remaining time. Its colors indicate uninterruptible casts, a ready interrupt, or an
+unavailable interrupt; when the
+interrupt becomes ready mid-cast, the timeline marks that boundary. Unknown or
+out-of-range states use the neutral or unavailable color rather than promising a
+kick. Interrupt detection follows the known class/spec or pet interrupt.
 
 New characters default to `Shift + Left Click`, Skull, and Party chat. Settings
 are stored per character in `FocusClaimSettings`.
@@ -36,7 +48,9 @@ supported unit frame. It does not create or manage a character macro.
 
 Refresh requests are coalesced, supported frames are deduplicated, and secure
 attributes are rewritten only when the binding plan changes. The settings
-controls are created only when the panel is first opened.
+controls are created only when the panel is first opened. The independent focus
+cast bar uses native cast/cooldown duration objects and secure-safe color/alpha
+operations for cast timing and interruptibility data.
 
 The default English macro is:
 

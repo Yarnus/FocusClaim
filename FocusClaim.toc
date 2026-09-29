@@ -11,3 +11,4 @@
 Localization.lua
 FrameProviders.lua
 FocusClaim.lua
+CastBar.lua
