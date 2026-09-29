@@ -27,6 +27,7 @@ Enter `/fc` or `/focusclaim` to open the settings panel. It contains:
 - Modifier key `Shift / Alt / Ctrl`
 - Callout channel `Disabled / Party / Instance / Raid`
 - An optional focus cast bar, locked by default; unlock it to drag and save its position
+- Adjustable cast-bar width (120–600) and height (12–64); its icon follows the bar height
 - Editable grey, green, orange, and neutral cast-bar colors
 
 The cast bar is off by default and normally appears only while the focus is
@@ -39,7 +40,9 @@ out-of-range states use the neutral or unavailable color rather than promising a
 kick. Interrupt detection follows the known class/spec or pet interrupt.
 
 New characters default to `Shift + Left Click`, Skull, and Party chat. Settings
-are stored per character in `FocusClaimSettings`.
+are shared across all characters on the account in `FocusClaimSettings`. Switching
+from per-character settings resets all options to their defaults; old character
+settings are not migrated.
 
 ## Design
 

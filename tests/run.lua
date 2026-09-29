@@ -194,6 +194,16 @@ local function newFrame(frameType)
     function frame:SetFillStyle(value) self.fillStyle = value end
     function frame:SetChecked(value) self.checked = value end
     function frame:GetChecked() return self.checked end
+    function frame:SetAutoFocus(value) self.autoFocus = value end
+    function frame:SetNumeric(value) self.numeric = value end
+    function frame:SetMaxLetters(value) self.maxLetters = value end
+    function frame:SetText(value) self.text = value end
+    function frame:GetText() return self.text end
+    function frame:ClearFocus()
+        if self.scripts.OnEditFocusLost then
+            self.scripts.OnEditFocusLost(self)
+        end
+    end
     function frame:CreateTexture()
         local texture = newTexture()
         self.textures = self.textures or {}
@@ -439,6 +449,8 @@ test("new settings preserve existing defaults and add a safe cast-bar default", 
     assertEqual(settings.castBarLocked, true)
     assertEqual(settings.castBarX, 0)
     assertEqual(settings.castBarY, 0)
+    assertEqual(settings.castBarWidth, 240)
+    assertEqual(settings.castBarHeight, 24)
     assertEqual(settings.castBarColors.grey.r, 0.45)
     assertEqual(settings.castBarColors.green.g, 0.8)
     assertEqual(settings.castBarColors.orange.r, 0.95)
@@ -462,7 +474,30 @@ test("invalid settings return to supported defaults", function()
     assertEqual(settings.castBarLocked, true)
     assertEqual(settings.castBarX, 0)
     assertEqual(settings.castBarY, 0)
+    assertEqual(settings.castBarWidth, 240)
+    assertEqual(settings.castBarHeight, 24)
     assertEqual(settings.enabled, nil)
+end)
+
+test("settings use account-wide storage and survive a different character loading", function()
+    local toc = assert(io.open("FocusClaim.toc", "r"))
+    local metadata = toc:read("*a")
+    toc:close()
+    assertContains(metadata, "## SavedVariables: FocusClaimSettings")
+    assertNotContains(metadata, "## SavedVariablesPerCharacter:")
+
+    local first = loadAddon("enUS")
+    local shared = first.addon:GetSettings()
+    shared.modifier = "alt"
+    shared.castBarWidth = 380
+    shared.castBarHeight = 36
+    shared.castBarColors.green.r = 0.4
+    local second = loadAddon("enUS", shared)
+    local settings = second.addon:GetSettings()
+    assertEqual(settings.modifier, "alt")
+    assertEqual(settings.castBarWidth, 380)
+    assertEqual(settings.castBarHeight, 36)
+    assertEqual(settings.castBarColors.green.r, 0.4)
 end)
 
 test("saved settings are normalized when FocusClaim finishes loading", function()
@@ -494,6 +529,8 @@ test("invalid cast-bar colors and coordinates normalize to safe defaults", funct
     local environment = loadAddon("enUS", {
         castBarX = 10001,
         castBarY = 12,
+        castBarWidth = 601,
+        castBarHeight = 11,
         castBarEnabled = true,
         castBarLocked = false,
         castBarColors = {
@@ -509,10 +546,31 @@ test("invalid cast-bar colors and coordinates normalize to safe defaults", funct
     assertEqual(settings.castBarLocked, false)
     assertEqual(settings.castBarX, 0)
     assertEqual(settings.castBarY, 12)
+    assertEqual(settings.castBarWidth, 240)
+    assertEqual(settings.castBarHeight, 24)
     assertEqual(settings.castBarColors.grey.r, 0.45)
     assertEqual(settings.castBarColors.green.r, 0.1)
     assertEqual(settings.castBarColors.orange.g, 0.42)
     assertEqual(settings.castBarColors.unknown.b, 0.72)
+end)
+
+test("cast-bar size accepts valid limits and rejects fractional values", function()
+    local environment = loadAddon("enUS", {
+        castBarWidth = 120,
+        castBarHeight = 64,
+    })
+    local settings = environment.addon:GetSettings()
+    assertEqual(settings.castBarWidth, 120)
+    assertEqual(settings.castBarHeight, 64)
+    assertEqual(environment.castBar.frame.width, 120)
+    assertEqual(environment.castBar.frame.height, 64)
+
+    environment = loadAddon("enUS", {
+        castBarWidth = 120.5,
+        castBarHeight = 24.5,
+    })
+    assertEqual(environment.addon:GetSettings().castBarWidth, 240)
+    assertEqual(environment.addon:GetSettings().castBarHeight, 24)
 end)
 
 test("the default macro has the fixed compact structure", function()
@@ -564,7 +622,7 @@ test("Traditional Chinese callout includes the focus unit name", function()
     )
 end)
 
-test("cast bar is opt-in and settings changes preserve its character position", function()
+test("cast bar is opt-in and settings changes preserve its shared position", function()
     local environment = loadAddon("enUS")
     local manager = environment.castBar
     local settings = environment.addon:GetSettings()
@@ -650,6 +708,45 @@ test("idle unlocked cast bars preview, drag, and restore their saved position", 
     assertEqual(reloaded.castBar.frame:IsShown(), true)
     assertEqual(reloaded.castBar.frame.point[4], 48)
     assertEqual(reloaded.castBar.frame.point[5], -92)
+end)
+
+test("width and height controls resize the cast and square icon", function()
+    local environment = loadAddon("enUS", { castBarEnabled = true })
+    local manager = environment.castBar
+    environment.castInfo = {
+        kind = "cast", name = "Resize", icon = "spell-icon",
+        notInterruptible = false, duration = newDuration(4, 1, 3),
+    }
+    environment.knownSpells[1766] = "player"
+    environment.cooldownDuration = newCooldown(false, 2)
+    castEvent(environment, "UNIT_SPELLCAST_START", "focus", "resize")
+    FocusClaimOptionsPanel.scripts.OnShow(FocusClaimOptionsPanel)
+    local width = manager.optionControls.castBarWidth.input
+    local height = manager.optionControls.castBarHeight.input
+    assertEqual(width.text, "240")
+    assertEqual(height.text, "24")
+    width:SetText("400")
+    width.scripts.OnEnterPressed(width)
+    height:SetText("40")
+    height.scripts.OnEnterPressed(height)
+    assertEqual(manager.frame.width, 400)
+    assertEqual(manager.frame.height, 40)
+    assertEqual(manager.iconFrame.width, 40)
+    assertEqual(manager.iconFrame.height, 40)
+    assertEqual(manager.marker.width, 400)
+    assertEqual(manager.marker.height, 40)
+    assertEqual(manager.readySegment.alpha, 1)
+    assertEqual(manager.frame.timerDuration, environment.castInfo.duration)
+    width:SetText("601")
+    width.scripts.OnEnterPressed(width)
+    height:SetText("0")
+    height.scripts.OnEnterPressed(height)
+    assertEqual(width.text, "400")
+    assertEqual(height.text, "40")
+    assertEqual(manager.frame.width, 400)
+    assertEqual(manager.frame.height, 40)
+    assertEqual(environment.addon:GetSettings().castBarWidth, 400)
+    assertEqual(environment.addon:GetSettings().castBarHeight, 40)
 end)
 
 test("cooldown states color the cast and mark its remaining-time boundary", function()
@@ -1108,7 +1205,7 @@ test("the options controls are created only when first shown", function()
     FocusClaimOptionsPanel.scripts.OnShow(FocusClaimOptionsPanel)
 
     assertEqual(initialFrames, 9)
-    assertEqual(builtFrames, 18)
+    assertEqual(builtFrames, 20)
     assertEqual(#environment.createdFrames, builtFrames)
 end)
 

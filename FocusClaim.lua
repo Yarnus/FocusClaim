@@ -13,6 +13,13 @@ local DEFAULTS = {
     castBarLocked = true,
     castBarX = 0,
     castBarY = 0,
+    castBarWidth = 240,
+    castBarHeight = 24,
+}
+
+ns.castBarSizeLimits = {
+    castBarWidth = { min = 120, max = 600 },
+    castBarHeight = { min = 12, max = 64 },
 }
 
 local DEFAULT_CAST_BAR_COLORS = {
@@ -61,6 +68,17 @@ local function IsFiniteNumber(value)
         and value < math.huge
 end
 
+local function NormalizeSize(value, limits, fallback)
+    if not IsFiniteNumber(value)
+        or value < limits.min
+        or value > limits.max
+        or value % 1 ~= 0
+    then
+        return fallback
+    end
+    return value
+end
+
 local function NormalizeColor(color, fallback)
     if type(color) ~= "table"
         or not IsFiniteNumber(color.r)
@@ -99,6 +117,13 @@ local function NormalizeSettings()
         y = DEFAULTS.castBarY
     end
 
+    local width = NormalizeSize(
+        settings.castBarWidth, ns.castBarSizeLimits.castBarWidth, DEFAULTS.castBarWidth
+    )
+    local height = NormalizeSize(
+        settings.castBarHeight, ns.castBarSizeLimits.castBarHeight, DEFAULTS.castBarHeight
+    )
+
     FocusClaimSettings = {
         modifier = modifier,
         marker = marker,
@@ -107,6 +132,8 @@ local function NormalizeSettings()
         castBarLocked = settings.castBarLocked ~= false,
         castBarX = x,
         castBarY = y,
+        castBarWidth = width,
+        castBarHeight = height,
         castBarColors = {
             grey = NormalizeColor(colors.grey, DEFAULT_CAST_BAR_COLORS.grey),
             green = NormalizeColor(colors.green, DEFAULT_CAST_BAR_COLORS.green),
@@ -343,7 +370,7 @@ local function BuildOptions()
         ns.castBar:BuildOptions(panel, -285)
     end
     if panel.SetHeight then
-        panel:SetHeight(585)
+        panel:SetHeight(675)
     end
 end
 

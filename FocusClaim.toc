@@ -6,7 +6,7 @@
 ## IconTexture: Interface\AddOns\FocusClaim\FocusClaim.tga
 ## Author: Yarnus
 ## Version: 1.0.3
-## SavedVariablesPerCharacter: FocusClaimSettings
+## SavedVariables: FocusClaimSettings
 
 Localization.lua
 FrameProviders.lua

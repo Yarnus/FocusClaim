@@ -9,6 +9,8 @@ local L = {
     CASTBAR_HEADER = "Focus cast bar",
     CASTBAR_ENABLE = "Show while the focus is casting",
     CASTBAR_LOCK = "Lock position",
+    CASTBAR_WIDTH = "Width (%d–%d)",
+    CASTBAR_HEIGHT = "Height (%d–%d)",
     CASTBAR_PREVIEW = "Drag to move",
     CASTBAR_COLORS = "Cast bar colors",
     CASTBAR_COLOR_GREY = "Uninterruptible",
@@ -35,6 +37,8 @@ if locale == "zhCN" then
     L.CASTBAR_HEADER = "焦点施法条"
     L.CASTBAR_ENABLE = "焦点施法时显示"
     L.CASTBAR_LOCK = "锁定位置"
+    L.CASTBAR_WIDTH = "宽度（%d–%d）"
+    L.CASTBAR_HEIGHT = "高度（%d–%d）"
     L.CASTBAR_PREVIEW = "拖动以移动"
     L.CASTBAR_COLORS = "施法条颜色"
     L.CASTBAR_COLOR_GREY = "不可打断"
@@ -58,6 +62,8 @@ elseif locale == "zhTW" then
     L.CASTBAR_HEADER = "焦點施法條"
     L.CASTBAR_ENABLE = "焦點施法時顯示"
     L.CASTBAR_LOCK = "鎖定位置"
+    L.CASTBAR_WIDTH = "寬度（%d–%d）"
+    L.CASTBAR_HEIGHT = "高度（%d–%d）"
     L.CASTBAR_PREVIEW = "拖曳以移動"
     L.CASTBAR_COLORS = "施法條顏色"
     L.CASTBAR_COLOR_GREY = "不可打斷"

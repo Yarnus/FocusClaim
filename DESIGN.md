@@ -8,7 +8,7 @@
 - 切换焦点时，先移除旧焦点标记，再将所选标记应用到新焦点。
 - 喊话包含本地化的固定文本、团队标记图标和 Focus Unit 名称。
 - FocusClaim 优先占用所选点击组合，不保存或恢复原绑定。
-- 可选的独立焦点施法条默认关闭，只在焦点施法或引导时显示；它可锁定/解锁拖动，并按角色保存位置。
+- 可选的独立焦点施法条默认关闭，锁定时只在焦点施法或引导时显示；解锁时可预览并拖动，位置按账号共享。
 - 施法条显示方形法术图标、法术名称和剩余时间。可打断颜色区分就绪与冷却；冷却在施法结束前到期时显示分段边界。不可打断施法显示灰色，距离或状态未知时使用中性色。
 
 ## 宏模型
@@ -50,20 +50,21 @@
 
 ## 配置模型
 
-`FocusClaimSettings` 是按角色保存的唯一配置，包含：
+`FocusClaimSettings` 是按账号共享的唯一配置，包含：
 
 - `modifier`: `shift / alt / ctrl`
 - `marker`: `1-8`
 - `channel`: `NONE / PARTY / INSTANCE / RAID`
 - `castBarEnabled` / `castBarLocked`: 施法条开关和拖动锁定
 - `castBarX` / `castBarY`: 相对屏幕中心的位置
+- `castBarWidth` / `castBarHeight`: 已验证的施法条宽高（120–600 / 12–64）
 - `castBarColors`: 已验证并归一化的 `grey / green / orange / unknown` RGB 颜色
 
-FocusClaim 不读取或迁移其他插件的配置。
+FocusClaim 不读取或迁移其他插件的配置。由按角色配置切换到按账号配置时，旧角色设置不迁移，使用默认值初始化账号配置。
 
 ## 焦点施法条
 
-`CastBar.lua` 独立管理焦点施法/引导事件和生命周期。状态栏使用 `UnitCastingDuration`、`UnitChannelDuration` 与原生 `SetTimerDuration` 更新进度和剩余时间；引导采用剩余时间方向。已知的玩家或宠物打断技能由职业技能列表和技能书事件刷新。冷却分段使用原生持续时间状态条定位，秘密值只传递给持续时间、颜色曲线和透明度 API，不参与 Lua 比较或算术。缺失或无法可靠判断的距离、冷却和可打断数据不会显示为绿色。
+`CastBar.lua` 独立管理焦点施法/引导事件和生命周期。设置页可调整宽高，图标边长始终等于施法条高度。状态栏使用 `UnitCastingDuration`、`UnitChannelDuration` 与原生 `SetTimerDuration` 更新进度和剩余时间；引导采用剩余时间方向。已知的玩家或宠物打断技能由职业技能列表和技能书事件刷新。冷却分段使用原生持续时间状态条定位，秘密值只传递给持续时间、颜色曲线和透明度 API，不参与 Lua 比较或算术。缺失或无法可靠判断的距离、冷却和可打断数据不会显示为绿色。
 
 ## 文件职责
 

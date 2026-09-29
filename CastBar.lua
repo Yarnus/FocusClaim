@@ -2,8 +2,6 @@ local _, ns = ...
 
 local addon = ns.addon
 local L = ns.L
-local BAR_WIDTH = 240
-local BAR_HEIGHT = 24
 local BAR_TEXTURE = "Interface\\Buttons\\WHITE8X8"
 
 local INTERRUPTS = {
@@ -213,7 +211,7 @@ local function SetTint(texture, color)
 end
 
 local frame = CreateFrame("StatusBar", "FocusClaimFocusCastBar", UIParent)
-frame:SetSize(BAR_WIDTH, BAR_HEIGHT)
+frame:SetSize(GetSettings().castBarWidth, GetSettings().castBarHeight)
 frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 frame:SetStatusBarTexture(BAR_TEXTURE)
 frame:SetMinMaxValues(0, 1)
@@ -231,7 +229,7 @@ background:SetAllPoints(frame)
 background:SetColorTexture(0.04, 0.04, 0.04, 0.9)
 
 local iconFrame = CreateFrame("Frame", nil, frame)
-iconFrame:SetSize(BAR_HEIGHT, BAR_HEIGHT)
+iconFrame:SetSize(GetSettings().castBarHeight, GetSettings().castBarHeight)
 iconFrame:SetPoint("RIGHT", frame, "LEFT", 0, 0)
 local icon = iconFrame:CreateTexture(nil, "ARTWORK")
 icon:SetAllPoints(iconFrame)
@@ -266,13 +264,14 @@ positioner:SetAllPoints(frame)
 positioner:SetStatusBarTexture(BAR_TEXTURE)
 positioner:SetAlpha(0)
 local marker = CreateFrame("StatusBar", nil, frame)
-marker:SetSize(BAR_WIDTH, BAR_HEIGHT)
+marker:SetSize(GetSettings().castBarWidth, GetSettings().castBarHeight)
 marker:SetStatusBarTexture(BAR_TEXTURE)
 marker:SetAlpha(0)
 
 local eventFrame = CreateFrame("Frame")
 local barManager = {
     frame = frame,
+    iconFrame = iconFrame,
     eventFrame = eventFrame,
     activeKind = nil,
     interruptSpell = nil,
@@ -294,6 +293,13 @@ local function ApplyPosition()
     local settings = GetSettings()
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", UIParent, "CENTER", settings.castBarX, settings.castBarY)
+end
+
+local function ApplySize()
+    local settings = GetSettings()
+    frame:SetSize(settings.castBarWidth, settings.castBarHeight)
+    iconFrame:SetSize(settings.castBarHeight, settings.castBarHeight)
+    marker:SetSize(settings.castBarWidth, settings.castBarHeight)
 end
 
 local function ApplyLock()
@@ -591,6 +597,7 @@ end
 
 function barManager:SettingsChanged()
     ApplyLock()
+    ApplySize()
     ApplyPosition()
     if GetSettings().castBarEnabled then
         RefreshCurrentCast()
@@ -611,6 +618,13 @@ function barManager:OptionChanged(setting)
         if not self.activeKind then
             StopCast()
         end
+    end
+end
+
+function barManager:SizeChanged()
+    ApplySize()
+    if self.activeKind then
+        UpdateActiveCast(true)
     end
 end
 
@@ -642,12 +656,46 @@ function barManager:BuildOptions(parent, y)
     CreateCheck("castBarEnabled", L.CASTBAR_ENABLE, 30)
     CreateCheck("castBarLocked", L.CASTBAR_LOCK, 58)
 
+    local function CreateSizeInput(setting, labelText, offset)
+        local limits = ns.castBarSizeLimits[setting]
+        local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        label:SetPoint("TOPLEFT", 20, y - offset)
+        label:SetText(labelText:format(limits.min, limits.max))
+        local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+        input:SetSize(60, 24)
+        input:SetPoint("LEFT", label, "RIGHT", 12, 0)
+        input:SetAutoFocus(false)
+        input:SetNumeric(true)
+        input:SetMaxLetters(3)
+        input:SetScript("OnEnterPressed", function(self)
+            self:ClearFocus()
+        end)
+        input:SetScript("OnEscapePressed", function(self)
+            self:SetText(tostring(GetSettings()[setting]))
+            self:ClearFocus()
+        end)
+        input:SetScript("OnEditFocusLost", function(self)
+            local value = tonumber(self:GetText())
+            if value and value >= limits.min and value <= limits.max and value % 1 == 0 then
+                if GetSettings()[setting] ~= value then
+                    GetSettings()[setting] = value
+                    barManager:SizeChanged()
+                end
+            end
+            self:SetText(tostring(GetSettings()[setting]))
+        end)
+        self.optionControls[setting] = { input = input }
+    end
+
+    CreateSizeInput("castBarWidth", L.CASTBAR_WIDTH, 94)
+    CreateSizeInput("castBarHeight", L.CASTBAR_HEIGHT, 126)
+
     local colorsHeader = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    colorsHeader:SetPoint("TOPLEFT", 20, y - 94)
+    colorsHeader:SetPoint("TOPLEFT", 20, y - 162)
     colorsHeader:SetText(L.CASTBAR_COLORS)
     for index = 1, #COLOR_KEYS do
         local key = COLOR_KEYS[index]
-        local rowY = y - 120 - (index - 1) * 34
+        local rowY = y - 188 - (index - 1) * 34
         local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         label:SetPoint("TOPLEFT", 20, rowY)
         label:SetText(COLOR_LABELS[key])
@@ -672,6 +720,8 @@ function barManager:RefreshOptions()
     for setting, control in pairs(self.optionControls) do
         if control.check then
             control.check:SetChecked(settings[setting])
+        elseif control.input then
+            control.input:SetText(tostring(settings[setting]))
         elseif control.swatch then
             local color = settings.castBarColors[control.key]
             control.swatch:SetColorTexture(color.r, color.g, color.b, 1)

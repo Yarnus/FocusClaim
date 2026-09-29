@@ -1,6 +1,6 @@
 # Focus cast bar implementation plan
 
-Repository: `/Users/iu/wow/FocusClaim` (single writer). This plan implements the user's requested independent, movable focus cast bar without changing existing focus-click bindings.
+Repository: `/Users/iu/wow/FocusClaim` (single writer). This plan records the original cast-bar delivery. Later requirements supersede its per-character and fixed-size choices: all settings are now account-wide with no old-character migration, and width/height are adjustable.
 
 ## Settled behavior
 
