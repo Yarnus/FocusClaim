@@ -5,7 +5,7 @@
 ## Notes-zhTW: 設定滑鼠指向焦點、團隊標記並可選向隊伍喊話。
 ## IconTexture: Interface\AddOns\FocusClaim\FocusClaim.tga
 ## Author: Yarnus
-## Version: 1.0.3
+## Version: 1.0.4
 ## SavedVariables: FocusClaimSettings
 
 Localization.lua
